@@ -1,9 +1,9 @@
 const cacheName = "Gargi-TFG_WEb-2.1.0";
 const contentToCache = [
     "Build/TFG3.loader.js",
-    "Build/TFG3.framework.js.br",
-    "Build/TFG3.data.br",
-    "Build/TFG3.wasm.br",
+    "Build/TFG3.framework.js",
+    "Build/TFG3.data",
+    "Build/TFG3.wasm",
     "TemplateData/style.css"
 
 ];
