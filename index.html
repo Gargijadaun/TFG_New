@@ -21,6 +21,15 @@
       <div id="unity-warning"> </div>
     </div>
     <script>
+      // Request microphone access before Unity loads
+navigator.mediaDevices.getUserMedia({ audio: true })
+  .then(function(stream) {
+    console.log("Microphone permission granted.");
+  })
+  .catch(function(err) {
+    console.warn("Microphone access denied or not available:", err);
+});
+
       window.addEventListener("load", function () {
         if ("serviceWorker" in navigator) {
           navigator.serviceWorker.register("ServiceWorker.js");
