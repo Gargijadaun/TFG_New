@@ -1,115 +1,144 @@
 <!DOCTYPE html>
 <html lang="en-us">
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-    <title>Unity WebGL Player | TFG_WEb</title>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-
-    <link rel="shortcut icon" href="TemplateData/favicon.ico">
-    <link rel="stylesheet" href="TemplateData/style.css">
-    <link rel="manifest" href="manifest.webmanifest">
-    <script src="TemplateData/ConvaiWebGLSDK.js"></script>
-  </head>
-  <body>
-    <div id="unity-container">
-      <canvas id="unity-canvas" width=960 height=600 tabindex="-1"></canvas>
-      <div id="unity-loading-bar">
-        <div id="unity-logo"></div>
-        <div id="unity-progress-bar-empty">
-          <div id="unity-progress-bar-full"></div>
-        </div>
+<head>
+  <meta charset="utf-8">
+  <title>Unity WebGL Player | TFG_WEb</title>
+  <link rel="shortcut icon" href="TemplateData/favicon.ico">
+  <link rel="stylesheet" href="TemplateData/style.css">
+  <link rel="manifest" href="manifest.webmanifest">
+  <script src="TemplateData/ConvaiWebGLSDK.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.4/dist/tesseract.min.js"></script>
+</head>
+<body>
+  <div id="unity-container">
+    <canvas id="unity-canvas" width="960" height="600" tabindex="-1"></canvas>
+    <div id="unity-loading-bar">
+      <div id="unity-logo"></div>
+      <div id="unity-progress-bar-empty">
+        <div id="unity-progress-bar-full"></div>
       </div>
-      <div id="unity-warning"> </div>
     </div>
-    <script>
-      // Request microphone access before Unity loads
-navigator.mediaDevices.getUserMedia({ audio: true })
-  .then(function(stream) {
-    console.log("Microphone permission granted.");
-  })
-  .catch(function(err) {
-    console.warn("Microphone access denied or not available:", err);
-});
+    <div id="unity-warning"></div>
+  </div>
 
-      window.addEventListener("load", function () {
-        if ("serviceWorker" in navigator) {
-          navigator.serviceWorker.register("ServiceWorker.js");
-        }
+  <!-- Webcam & OCR UI -->
+  <div style="text-align:center; margin-top: 20px;">
+    <video id="webcam" autoplay playsinline width="320" height="240" style="border: 1px solid #aaa;"></video><br>
+    <button onclick="scanCard()">📸 Scan Card</button>
+    <canvas id="ocr-canvas" width="320" height="240" style="display: none;"></canvas>
+  </div>
+
+  <script>
+    // Initialize webcam
+    const video = document.getElementById("webcam");
+    const ocrCanvas = document.getElementById("ocr-canvas");
+    const ctx = ocrCanvas.getContext("2d");
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Webcam error:", err);
       });
 
-      var container = document.querySelector("#unity-container");
-      var canvas = document.querySelector("#unity-canvas");
-      var loadingBar = document.querySelector("#unity-loading-bar");
-      var progressBarFull = document.querySelector("#unity-progress-bar-full");
-      var warningBanner = document.querySelector("#unity-warning");
-
-      // Shows a temporary message banner/ribbon for a few seconds, or
-      // a permanent error message on top of the canvas if type=='error'.
-      // If type=='warning', a yellow highlight color is used.
-      // Modify or remove this function to customize the visually presented
-      // way that non-critical warnings and error messages are presented to the
-      // user.
-      function unityShowBanner(msg, type) {
-        function updateBannerVisibility() {
-          warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
+    // Extract name from OCR text
+    function extractNameFromText(text) {
+      const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+      for (let line of lines) {
+        if (/^[A-Z][a-z]+(\s+[A-Z][a-z]+)+$/.test(line)) {
+          return line;
         }
-        var div = document.createElement('div');
-        div.innerHTML = msg;
-        warningBanner.appendChild(div);
-        if (type == 'error') div.style = 'background: red; padding: 10px;';
-        else {
-          if (type == 'warning') div.style = 'background: yellow; padding: 10px;';
-          setTimeout(function() {
-            warningBanner.removeChild(div);
-            updateBannerVisibility();
-          }, 5000);
+      }
+      return "Guest";
+    }
+
+    // Scan and process business card
+    function scanCard() {
+      ctx.drawImage(video, 0, 0, ocrCanvas.width, ocrCanvas.height);
+      const image = ocrCanvas.toDataURL("image/png");
+
+      Tesseract.recognize(image, 'eng', {
+        logger: m => console.log(m)
+      }).then(({ data: { text } }) => {
+        console.log("OCR Text:", text);
+        const name = extractNameFromText(text);
+        console.log("Detected Name:", name);
+
+        if (typeof unityInstance !== "undefined") {
+          unityInstance.SendMessage("ConvaiManager", "GreetUserByName", name);
         }
-        updateBannerVisibility();
+      });
+    }
+  </script>
+
+  <!-- Unity WebGL Loader -->
+  <script>
+    window.addEventListener("load", function () {
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("ServiceWorker.js");
       }
+    });
 
-      var buildUrl = "Build";
-      var loaderUrl = buildUrl + "/TFG3.loader.js";
-      var config = {
-        dataUrl: buildUrl + "/TFG3.data",
-        frameworkUrl: buildUrl + "/TFG3.framework.js",
-        codeUrl: buildUrl + "/TFG3.wasm",
-        streamingAssetsUrl: "StreamingAssets",
-        companyName: "Gargi",
-        productName: "TFG_WEb",
-        productVersion: "2.1.0",
-        showBanner: unityShowBanner,
-      };
+    var container = document.querySelector("#unity-container");
+    var canvas = document.querySelector("#unity-canvas");
+    var loadingBar = document.querySelector("#unity-loading-bar");
+    var progressBarFull = document.querySelector("#unity-progress-bar-full");
+    var warningBanner = document.querySelector("#unity-warning");
 
-      // By default Unity keeps WebGL canvas render target size matched with
-      // the DOM size of the canvas element (scaled by window.devicePixelRatio)
-      // Set this to false if you want to decouple this synchronization from
-      // happening inside the engine, and you would instead like to size up
-      // the canvas DOM size and WebGL render target sizes yourself.
-      // config.matchWebGLToCanvasSize = false;
-
-      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
-        // Mobile device style: fill the whole browser client area with the game canvas:
-        var meta = document.createElement('meta');
-        meta.name = 'viewport';
-        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
-        document.getElementsByTagName('head')[0].appendChild(meta);
+    function unityShowBanner(msg, type) {
+      function updateBannerVisibility() {
+        warningBanner.style.display = warningBanner.children.length ? 'block' : 'none';
       }
+      var div = document.createElement('div');
+      div.innerHTML = msg;
+      warningBanner.appendChild(div);
+      if (type === 'error') div.style = 'background: red; padding: 10px;';
+      else {
+        if (type === 'warning') div.style = 'background: yellow; padding: 10px;';
+        setTimeout(() => {
+          warningBanner.removeChild(div);
+          updateBannerVisibility();
+        }, 5000);
+      }
+      updateBannerVisibility();
+    }
 
-      loadingBar.style.display = "block";
+    var buildUrl = "Build";
+    var loaderUrl = buildUrl + "/TFgcard.loader.js";
+    var config = {
+      dataUrl: buildUrl + "/TFgcard.data",
+      frameworkUrl: buildUrl + "/TFgcard.framework.js",
+      codeUrl: buildUrl + "/TFgcard.wasm",
+      streamingAssetsUrl: "StreamingAssets",
+      companyName: "Gargi",
+      productName: "TFG_WEb",
+      productVersion: "2.1.0",
+      showBanner: unityShowBanner,
+    };
 
-      var script = document.createElement("script");
-      script.src = loaderUrl;
-      script.onload = () => {
-        createUnityInstance(canvas, config, (progress) => {
-          progressBarFull.style.width = 100 * progress + "%";
-        }).then((unityInstance) => {
-          loadingBar.style.display = "none";
-        }).catch((message) => {
-          alert(message);
-        });
-      };
-      document.body.appendChild(script);
-    </script>
-  </body>
+    if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+      var meta = document.createElement('meta');
+      meta.name = 'viewport';
+      meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+      document.getElementsByTagName('head')[0].appendChild(meta);
+    }
+
+    loadingBar.style.display = "block";
+
+    var script = document.createElement("script");
+    script.src = loaderUrl;
+    script.onload = () => {
+      createUnityInstance(canvas, config, (progress) => {
+        progressBarFull.style.width = 100 * progress + "%";
+      }).then((unityInstanceInstance) => {
+        loadingBar.style.display = "none";
+        window.unityInstance = unityInstanceInstance; // Expose for OCR to use
+      }).catch((message) => {
+        alert(message);
+      });
+    };
+    document.body.appendChild(script);
+  </script>
+</body>
 </html>
